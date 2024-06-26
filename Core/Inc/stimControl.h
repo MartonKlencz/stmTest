@@ -30,6 +30,8 @@ extern DAC_HandleTypeDef hdac1;
 
 extern SPIHandler spiHandler;
 
+extern uint8_t stimulationInfoCommand;
+
 
 bool debugPin = 0;
 

@@ -5,7 +5,8 @@
 #ifndef L476_DAC_GLOBALS_H
 #define L476_DAC_GLOBALS_H
 
-#define RX_SIZE 8
+#define RX1_SIZE 8
+#define RX2_SIZE 3
 
 #define STIMCHANNELORDERSIZE 30
 

@@ -62,6 +62,7 @@ extern void handleStimulation();
 
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_tim2_up;
+extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
 
@@ -227,6 +228,28 @@ void DMA1_Channel2_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles USART1 global interrupt.
+  */
+void USART1_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART1_IRQn 0 */
+	//check if timeout flag is set
+		if ((huart1.Instance->ISR & 0x800) != 0)
+		{
+		  UART_timeOutOccured = true;
+		}
+  /* USER CODE END USART1_IRQn 0 */
+  HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
+  if (huart1.RxXferCount == RX1_SIZE - 1)
+    {
+  	  SET_BIT(huart1.Instance->CR1, USART_CR1_RTOIE);
+  	  SET_BIT(huart1.Instance->CR2, USART_CR2_RTOEN);
+    }
+  /* USER CODE END USART1_IRQn 1 */
+}
+
+/**
   * @brief This function handles USART2 global interrupt.
   */
 void USART2_IRQHandler(void)
@@ -248,7 +271,7 @@ void USART2_IRQHandler(void)
 
 
   // on the first data byte start the timeout counter
-  if (huart2.RxXferCount == RX_SIZE - 1)
+  if (huart2.RxXferCount == RX2_SIZE - 1)
   {
 	  SET_BIT(huart2.Instance->CR1, USART_CR1_RTOIE);
 	  SET_BIT(huart2.Instance->CR2, USART_CR2_RTOEN);

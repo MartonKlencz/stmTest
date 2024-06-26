@@ -52,14 +52,19 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim2;
 DMA_HandleTypeDef hdma_tim2_up;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-extern bool startParseInput;
+extern uint8_t startParseInput1;
+extern uint8_t startParseInput2;
+
+extern uint8_t stimulationInfoCommand;
 
 
-extern uint8_t Rx_data[RX_SIZE];
+extern uint8_t Rx1_data[RX1_SIZE];
+extern uint8_t Rx2_data[RX2_SIZE];
 
 extern SPIHandler spiHandler;
 
@@ -73,6 +78,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_DAC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -95,6 +101,8 @@ extern volatile bool UART_timeOutOccured;
 extern void fillWithBell(uint32_t* array, size_t size, double avg, double dev, double amp, double offset);
 
 extern void parseUserInput();
+extern void parseBatteryInfo();
+extern void sendStimProgramInfo(uint8_t command);
 
 extern void generateStimulationPattern();
 extern void start_DMA();
@@ -154,14 +162,15 @@ int main(void)
   MX_DAC1_Init();
   MX_TIM2_Init();
   MX_SPI1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   	//DAC CLR
   	HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_5,  GPIO_PIN_SET);
   	//-HV ENABLE
-  	HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_7,  GPIO_PIN_SET);
+  	HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_7,  GPIO_PIN_RESET);
   	//+HV ENABLE
-  	HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_9,  GPIO_PIN_SET);
+  	HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_9,  GPIO_PIN_RESET);
   	//SWITCH CLR
   	HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_8,  GPIO_PIN_RESET);
   	//SWITCH LATCH ENABLE
@@ -178,7 +187,13 @@ int main(void)
 
 	hdac1.Instance->DHR12R1 = 0;
 
-	if (HAL_UART_Receive_IT(&huart2, Rx_data, RX_SIZE) != HAL_OK)
+
+	if (HAL_UART_Receive_IT(&huart1, Rx1_data, RX1_SIZE) != HAL_OK)
+	{
+	   Error_Handler();
+	}
+
+	if (HAL_UART_Receive_IT(&huart2, Rx2_data, RX2_SIZE) != HAL_OK)
 	{
 	   Error_Handler();
 	}
@@ -190,10 +205,12 @@ int main(void)
 	__HAL_DMA_DISABLE_IT(&hdma_tim2_up, DMA_IT_HT);
 
 
-	//set UART timeout to two seconds (2 secs * (1 / 115200 baud))
+	//set UART timeout to two seconds (2 seconds * (1 / 115200 baud))
+	MODIFY_REG(huart1.Instance->RTOR, USART_RTOR_RTO, 230400);
+
 	MODIFY_REG(huart2.Instance->RTOR, USART_RTOR_RTO, 230400);
 
-	printf("Ready \r\n");
+	//printf("Ready \r\n");
 
   /* USER CODE END 2 */
 
@@ -201,9 +218,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	if (startParseInput)
+	if (startParseInput1 == 1)
 	{
 		parseUserInput();
+		startParseInput1 = 0;
+
+	}
+	if (startParseInput2 == 2)
+	{
+		parseBatteryInfo();
+		startParseInput2 = 0;
+	}
+
+	if (stimulationInfoCommand != 0x0)
+	{
+		sendStimProgramInfo(stimulationInfoCommand);
+		stimulationInfoCommand = 0;
 	}
 
 	if (UART_timeOutOccured)
@@ -407,6 +437,41 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -422,7 +487,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 19200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -475,8 +540,8 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4|DAC_CLR_Pin|GPIO_PIN_7|GPIO_PIN_8
-                          |GPIO_PIN_9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4|DAC_CLR_Pin|GPIO_PIN_6|GPIO_PIN_7
+                          |GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_10
@@ -487,10 +552,10 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PC4 DAC_CLR_Pin PC7 PC8
-                           PC9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_4|DAC_CLR_Pin|GPIO_PIN_7|GPIO_PIN_8
-                          |GPIO_PIN_9;
+  /*Configure GPIO pins : PC4 DAC_CLR_Pin PC6 PC7
+                           PC8 PC9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4|DAC_CLR_Pin|GPIO_PIN_6|GPIO_PIN_7
+                          |GPIO_PIN_8|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -524,23 +589,42 @@ static void MX_GPIO_Init(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 
-    if (checkCRC())
-    {
-        if (!startParseInput)
-        {
-            startParseInput = 1;
-        }
-    } else
-    {
-        printf("CRC error\r\n");
-    }
+	//reset timeout interrupt registers because transfer is complete
+	CLEAR_BIT(huart->Instance->CR1, USART_CR1_RTOIE);
+	WRITE_REG(huart->Instance->ICR, USART_ICR_RTOCF);
+	CLEAR_BIT(huart->Instance->CR2, USART_CR2_RTOEN);
 
-    //reset timeout interrupt registers because transfer is complete
-    CLEAR_BIT(huart2.Instance->CR1, USART_CR1_RTOIE);
-    WRITE_REG(huart2.Instance->ICR, USART_ICR_RTOCF);
-    CLEAR_BIT(huart2.Instance->CR2, USART_CR2_RTOEN);
+	GPIOC->BSRR = (uint32_t) GPIO_PIN_6;
+	if (huart == &huart1)
+	{
+		if (checkCRC(Rx1_data, RX1_SIZE))
+		{
+			if (startParseInput1 == 0)
+			{
+				startParseInput1 = 1;
+			}
+		} else
+		{
+			//printf("CRC error\r\n");
+		}
 
-	HAL_UART_Receive_IT(huart, Rx_data, RX_SIZE);
+		GPIOC->BRR = (uint32_t) GPIO_PIN_6;
+		HAL_UART_Receive_IT(&huart1, Rx1_data, RX1_SIZE);
+
+	} else if (huart == &huart2)
+	{
+		if (checkCRC(Rx2_data, RX2_SIZE))
+		{
+			if (startParseInput2 == 0)
+			{
+				startParseInput2 = 2;
+			}
+		} else
+		{
+			//printf("CRC error\r\n");
+		}
+		HAL_UART_Receive_IT(&huart2, Rx2_data, RX2_SIZE);
+	}
 }
 /* USER CODE END 4 */
 

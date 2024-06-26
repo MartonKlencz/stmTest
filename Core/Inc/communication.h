@@ -15,6 +15,7 @@
 #include "globals.h"
 
 //extern TIM_HandleTypeDef htim3;
+extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 extern DAC_HandleTypeDef hdac1;
 extern TIM_HandleTypeDef htim2;
@@ -29,13 +30,17 @@ extern volatile void enablePanel(uint8_t address);
 
 //***** private variables
 
-bool startParseInput = false;
+uint8_t startParseInput1 = 0;
+uint8_t startParseInput2 = 0;
+
+uint8_t stimulationInfoCommand = 0x00;
 
 bool UART_timeOutOccured;
 
 
 //data array from UART
-uint8_t Rx_data[RX_SIZE];
+uint8_t Rx1_data[RX1_SIZE];
+uint8_t Rx2_data[RX2_SIZE];
 
 //spi handler for switch control
 SPIHandler spiHandler;
@@ -55,7 +60,11 @@ uint8_t enableSPITransmit = 0;
 //***** functions
 void parseUserInput();
 
-bool checkCRC();
+void parseBatteryInfo();
+
+void sendStimProgramInfo(uint8_t command);
+
+bool checkCRC(uint8_t* data, uint16_t size);
 
 void UART_handleTimeOut();
 

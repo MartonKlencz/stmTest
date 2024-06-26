@@ -239,7 +239,7 @@ void handleStimulation()
     //enableStimulation is controlled by user commands from UART
     if (!stimulationController.enableStimulation)
     {
-    	GPIOC->BRR = (uint32_t) GPIO_PIN_4;
+    	GPIOC->BRR = (uint32_t) GPIO_PIN_4; //sync signal -> low
         return;
     }
 
@@ -299,6 +299,8 @@ void handleStimulation()
                         //this means that only one stimulation was requested
                         stimulationController.enableStimulation = 0;
 
+                        stimulationInfoCommand = 0x03;
+
                         CLEAR_BIT(DMA1_Channel2->CCR, 1);
                         DMA1_Channel2->CMAR = (uint32_t) &Line_LUT;
                         TIM2->ARR = DEFAULT_TIMING;
@@ -313,9 +315,13 @@ void handleStimulation()
                         return;
                     }
                 }
+                GPIOC->BSRR = (uint32_t) GPIO_PIN_6;
                 //enablePanel(stimulationController.channelOrder[stimulationController.channelIndex]);
                 spiHandler.data[0] = stimulationController.channelOrder[stimulationController.channelIndex];
                 spiHandler.enableTransit = true;
+
+                stimulationInfoCommand = 0x04;
+                GPIOC->BRR = (uint32_t) GPIO_PIN_6;
 
                 hdac1.Instance->DHR12R1 = (uint16_t)  (stimulationController.intensityMultiplier *
                         (float) (stimulationController.channelOrderIntensity[stimulationController.channelIndex] & 0x0fff));
